@@ -656,7 +656,7 @@ function prepareL4L5(image){
 function prepareL7(image){
   var bandList = ['B1', 'B2','B3','B4','B5','B7','B6']
   var nameList = ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'TEMP']
-  var scaling = [10000, 10000, 10000, 10000, 10000, 10000, 1000]
+  var scaling = [0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.00341802]
   var scaled = ee.Image(image).select(bandList).rename(nameList).divide(ee.Image.constant(scaling))
 
   var validQA = [66, 130, 68, 132]
