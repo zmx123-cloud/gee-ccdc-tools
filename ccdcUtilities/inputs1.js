@@ -663,14 +663,13 @@ function prepareL7(image){
   var qa=ee.Image(image).select(['QA_PIXEL'])
   var cloudsBitMask = (1 << 3)//cloud
   var cloudShadowBitMask = (1 << 4)//cloudshadow
-  
-  var mask1 = .remap(validQA, ee.List.repeat(1, validQA.length), 0)
+  var mask1 = qa.bitwiseAnd(cloudShadowBitMask).eq(0).and(qa.bitwiseAnd(cloudsBitMask).eq(0))
   // Gat valid data mask, for pixels without band saturation
-  var mask2 = image.select('radsat_qa').eq(0)
+  var mask2 = image.select('QA_RADSAT').eq(0)
   var mask3 = image.select(bandList).reduce(ee.Reducer.min()).gt(0)
   // Mask hazy pixels. Aggressively filters too many images in arid regions (e.g Egypt)
   // unless we force include 'nodata' values by unmasking
-  var mask4 = image.select("sr_atmos_opacity").unmask().lt(300)
+  var mask4 = image.select("SR_ATMOS_OPACITY").unmask().lt(300)
   // Slightly erode bands to get rid of artifacts due to scan lines
   var mask5 = ee.Image(image).mask().reduce(ee.Reducer.min()).focal_min(2.5)
   return ee.Image(image).addBands(scaled).updateMask(mask1.and(mask2).and(mask3).and(mask4).and(mask5))
@@ -684,17 +683,18 @@ function prepareL7(image){
 function prepareL8(image){
   var bandList = ['SR_B1', 'SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','ST_B10']
   var nameList = ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'TEMP']
-  var scaling = [10000, 10000, 10000, 10000, 10000, 10000, 1000]
-
-  var validTOA = [66, 68, 72, 80, 96, 100, 130, 132, 136, 144, 160, 164]
-  var validQA = [322, 386, 324, 388, 836, 900]
-
-  var scaled = ee.Image(image).select(bandList).rename(nameList).divide(ee.Image.constant(scaling))
-  var mask1 = ee.Image(image).select(['pixel_qa']).remap(validQA, ee.List.repeat(1, validQA.length), 0)
-  var mask2 = image.select('radsat_qa').eq(0)
+  var scaling = [0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.00341802]
+  var offset=[-0.2,-0.2,-0.2,-0.2,-0.2,-0.2, 149.0]
+  var scaled = ee.Image(image).select(bandList).rename(nameList).multiply(ee.Image.constant(scaling)).add(ee.Image.constant(offset))
+  var qa=ee.Image(image).select(['QA_PIXEL'])
+  var cloudsBitMask = (1 << 3)//cloud
+  var cloudShadowBitMask = (1 << 4)//cloudshadow
+  var mask1 = qa.bitwiseAnd(cloudShadowBitMask).eq(0).and(qa.bitwiseAnd(cloudsBitMask).eq(0))
+  
+  var mask2 = image.select('QA_RADSAT').eq(0)
   var mask3 = image.select(bandList).reduce(ee.Reducer.min()).gt(0)
-  var mask4 = ee.Image(image).select(['sr_aerosol']).remap(validTOA, ee.List.repeat(1, validTOA.length), 0)
-  return ee.Image(image).addBands(scaled).updateMask(mask1.and(mask2).and(mask3).and(mask4))
+  //var mask4 = ee.Image(image).select(['sr_aerosol']).remap(validTOA, ee.List.repeat(1, validTOA.length), 0)
+  return ee.Image(image).addBands(scaled).updateMask(mask1.and(mask2).and(mask3))
 }
 
 /**
@@ -705,22 +705,22 @@ function prepareL8(image){
 * @returns {ee.ImageCollection} Filtered Landsat collection
 */
 function generateCollection(geom, startDate, endDate){
-  var filteredL8 = (ee.ImageCollection('LANDSAT/LC08/C01/T1_SR')
+  var filteredL8 = (ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
                       .filter("WRS_ROW < 122")
                       .filterBounds(geom)
                       .map(prepareL8))
 
-  var filteredL7 = (ee.ImageCollection('LANDSAT/LE07/C01/T1_SR')
+  var filteredL7 = (ee.ImageCollection('LANDSAT/LE07/C02/T1_L2')
                       .filter("WRS_ROW < 122")
                       .filterBounds(geom)
                       .map(prepareL7))
                       
   // Originally not included in Noel's run
-  var filteredL4 = (ee.ImageCollection('LANDSAT/LT04/C01/T1_SR')
+  var filteredL4 = (ee.ImageCollection('LANDSAT/LT04/C02/T1_L2')
                       .filter("WRS_ROW < 122")
                       .filterBounds(geom)
                       .map(prepareL4L5))
-  var filteredL5 = (ee.ImageCollection('LANDSAT/LT05/C01/T1_SR')
+  var filteredL5 = (ee.ImageCollection('LANDSAT/LT05/C02/T1_L2')
                       .filter("WRS_ROW < 122")
                       .filterBounds(geom)
                       .map(prepareL4L5))
