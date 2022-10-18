@@ -28,13 +28,13 @@ function getLandsat(options) {
   var sensors = (options && options.sensors) || {l4: true, l5: true, l7: true, l8: true}
  
   // Filter using new filtering functions
-  var collection4 = ee.ImageCollection('LANDSAT/LT04/C01/T1_SR')
+  var collection4 = ee.ImageCollection('LANDSAT/LT04/C02/T1_L2')
       .filterDate(start, end)
-  var collection5 = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR')
+  var collection5 = ee.ImageCollection('LANDSAT/LT05/C02/T1_L2')
       .filterDate(start, end)
-  var collection7 = ee.ImageCollection('LANDSAT/LE07/C01/T1_SR')
+  var collection7 = ee.ImageCollection('LANDSAT/LE07/C02/T1_L2')
       .filterDate(start, end)
-  var collection8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_SR')
+  var collection8 = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
       .filterDate(start, end)
    if (useMask == 'No') {
     useMask = false
@@ -632,19 +632,20 @@ function getS1(focalSize, kernelType) {
 * @returns {ee.Image} Landsat image with masked noisy pixels
 */
 function prepareL4L5(image){
-  var bandList = ['B1', 'B2','B3','B4','B5','B7','B6']
+  var bandList = ['SR_B1', 'SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','ST_B6']
   var nameList = ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'TEMP']
-  var scaling = [10000, 10000, 10000, 10000, 10000, 10000, 1000]
-  var scaled = ee.Image(image).select(bandList).rename(nameList).divide(ee.Image.constant(scaling))
-
-  var validQA = [66, 130, 68, 132]
-  var mask1 = ee.Image(image).select(['pixel_qa']).remap(validQA, ee.List.repeat(1, validQA.length), 0)
-  // Gat valid data mask, for pixels without band saturation
-  var mask2 = image.select('radsat_qa').eq(0)
+  var scaling = [0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.00341802]
+  var offset=[-0.2,-0.2,-0.2,-0.2,-0.2,-0.2, 149.0]
+  var scaled = ee.Image(image).select(bandList).rename(nameList).multiply(ee.Image.constant(scaling)).add(ee.Image.constant(offset))
+  var cloudsBitMask = (1 << 3)//cloud
+  var cloudShadowBitMask = (1 << 4)//cloudshadow
+  var qa = ee.Image(image).select(['QA_PIXEL'])
+  var mask1 =qa.bitwiseAnd(cloudShadowBitMask).eq(0).and(qa.bitwiseAnd(cloudsBitMask).eq(0))
+  var mask2 = image.select('QA_RADSAT').eq(0)
   var mask3 = image.select(bandList).reduce(ee.Reducer.min()).gt(0)
   // Mask hazy pixels. Aggressively filters too many images in arid regions (e.g Egypt)
   // unless we force include 'nodata' values by unmasking
-  var mask4 = image.select("sr_atmos_opacity").unmask().lt(300)
+  var mask4 = image.select("SR_ATMOS_OPACITY").unmask().lt(300)
   return ee.Image(image).addBands(scaled).updateMask(mask1.and(mask2).and(mask3).and(mask4))
 }
 
@@ -654,13 +655,16 @@ function prepareL4L5(image){
 * @returns {ee.Image} Landsat image with masked noisy pixels
 */
 function prepareL7(image){
-  var bandList = ['B1', 'B2','B3','B4','B5','B7','B6']
+  var bandList = ['SR_B1', 'SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','ST_B6']
   var nameList = ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'TEMP']
   var scaling = [0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.0000275, 0.00341802]
-  var scaled = ee.Image(image).select(bandList).rename(nameList).divide(ee.Image.constant(scaling))
-
-  var validQA = [66, 130, 68, 132]
-  var mask1 = ee.Image(image).select(['pixel_qa']).remap(validQA, ee.List.repeat(1, validQA.length), 0)
+  var offset=[-0.2,-0.2,-0.2,-0.2,-0.2,-0.2, 149.0]
+  var scaled = ee.Image(image).select(bandList).rename(nameList).multiply(ee.Image.constant(scaling)).add(ee.Image.constant(offset))
+  var qa=ee.Image(image).select(['QA_PIXEL'])
+  var cloudsBitMask = (1 << 3)//cloud
+  var cloudShadowBitMask = (1 << 4)//cloudshadow
+  
+  var mask1 = .remap(validQA, ee.List.repeat(1, validQA.length), 0)
   // Gat valid data mask, for pixels without band saturation
   var mask2 = image.select('radsat_qa').eq(0)
   var mask3 = image.select(bandList).reduce(ee.Reducer.min()).gt(0)
@@ -678,7 +682,7 @@ function prepareL7(image){
 * @returns {ee.Image} Landsat image with masked noisy pixels
 */
 function prepareL8(image){
-  var bandList = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B10']
+  var bandList = ['SR_B1', 'SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','ST_B10']
   var nameList = ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'TEMP']
   var scaling = [10000, 10000, 10000, 10000, 10000, 10000, 1000]
 
